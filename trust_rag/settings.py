@@ -19,11 +19,18 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # --- LLM endpoints (OpenAI-compatible; defaults point at local Ollama) ---
+    llm_api_base: str = "http://localhost:11434/v1"
+    generation_model: str = "qwen2.5:7b"
+    verification_model: str = "qwen2.5:7b"
+    llm_api_key: str = "ollama"  # Ollama ignores keys; swap for real providers
+
+    embedding_api_base: str = "http://localhost:11434/v1"
+    embedding_model: str = "bge-m3"
+
+    # Z.ai (or any OpenAI-compatible provider) — set via env to switch
     z_ai_api_key: str = ""
     z_ai_api_base: str = "https://api.z.ai/api/paas/v4"
-    generation_model: str = "glm-4.6"
-    verification_model: str = "glm-4.6"
-    local_embedding_model: str = "BAAI/bge-m3"
 
     langfuse_enabled: bool = False
     langfuse_public_key: str = ""

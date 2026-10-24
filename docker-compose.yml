@@ -8,7 +8,8 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
-      HF_HOME: /app/data/hf
+      LLM_API_BASE: http://host.docker.internal:11434/v1
+      EMBEDDING_API_BASE: http://host.docker.internal:11434/v1
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the worker
@@ -27,7 +28,8 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
-      HF_HOME: /app/data/hf
+      LLM_API_BASE: http://host.docker.internal:11434/v1
+      EMBEDDING_API_BASE: http://host.docker.internal:11434/v1
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the api
