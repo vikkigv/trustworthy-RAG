@@ -19,7 +19,7 @@ from trust_rag.storage import get_storage
 def _fake_embedding(text: str) -> list[float]:
     """Deterministic vector matching the column's 1536 dimensions."""
     base = [float(len(text) % 7), 1.0, 0.5]
-    return base + [0.0] * (2000 - len(base))
+    return base + [0.0] * (1024 - len(base))
 
 
 @pytest.fixture()
@@ -95,7 +95,7 @@ class TestPipeline:
             ).scalars().all()
             assert len(chunks) == written
             first = chunks[0]
-            assert first.embedding is not None and len(first.embedding) == 2000
+            assert first.embedding is not None and len(first.embedding) == 1024
             assert first.tsv is not None  # BM25 column populated
             assert first.tenant_id == doc.tenant_id  # denormalized for SQL-level isolation
 

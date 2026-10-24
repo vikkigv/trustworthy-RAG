@@ -8,6 +8,7 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      HF_HOME: /app/data/hf
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the worker
@@ -26,6 +27,7 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      HF_HOME: /app/data/hf
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the api

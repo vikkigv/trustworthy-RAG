@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     redis_port: int = 6379
 
     z_ai_api_key: str = ""
-    generation_model: str = "zai/glm-4.6"
-    verification_model: str = "zai/glm-4.6"
-    embedding_model: str = "zai/embedding-3"
+    z_ai_api_base: str = "https://api.z.ai/api/paas/v4"
+    generation_model: str = "glm-4.6"
+    verification_model: str = "glm-4.6"
+    local_embedding_model: str = "BAAI/bge-m3"
 
     langfuse_enabled: bool = False
     langfuse_public_key: str = ""
