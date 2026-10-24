@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "http://localhost:3000"
 
+    # --- Documents / storage ---
+    data_dir: str = "./data"  # local storage root; S3 backend swaps this out in prod
+    max_upload_mb: int = 25
+    allowed_mime_types: tuple[str, ...] = (
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/markdown",
+        "text/plain",
+    )
+
     @property
     def database_url(self) -> str:
         return (

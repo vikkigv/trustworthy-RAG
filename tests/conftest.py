@@ -6,6 +6,7 @@ docker-compose.yml. They are skipped automatically if it isn't reachable.
 
 import asyncio
 import os
+import tempfile
 
 import asyncpg
 import pytest
@@ -14,6 +15,7 @@ TEST_DB = "trust_rag_test"
 
 # Must happen before any trust_rag import reads settings.
 os.environ["POSTGRES_DB"] = TEST_DB
+os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="trust_rag_test_data_")
 
 
 def _postgres_reachable() -> bool:
@@ -55,7 +57,27 @@ def _ensure_test_db() -> None:
     asyncio.run(create())
 
 
-if _postgres_reachable():
+def _redis_reachable() -> bool:
+    try:
+
+        async def check() -> bool:
+            import redis.asyncio as aioredis
+
+            r = aioredis.Redis(
+                host=os.environ.get("REDIS_HOST", "localhost"),
+                port=int(os.environ.get("REDIS_PORT", "6379")),
+                socket_connect_timeout=2,
+            )
+            await r.ping()
+            await r.aclose()
+            return True
+
+        return asyncio.run(check())
+    except OSError:
+        return False
+
+
+if _postgres_reachable() and _redis_reachable():
     _ensure_test_db()
     from alembic import command
     from alembic.config import Config
@@ -69,7 +91,7 @@ else:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list) -> None:
     if not HAS_DB:
-        skip = pytest.mark.skip(reason="Postgres not reachable")
+        skip = pytest.mark.skip(reason="Postgres/Redis not reachable")
         for item in items:
             if "/tests/" in str(item.fspath):
                 item.add_marker(skip)

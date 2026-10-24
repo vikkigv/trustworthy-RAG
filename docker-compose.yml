@@ -9,6 +9,8 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
     env_file: .env
+    volumes:
+      - ./data:/app/data  # document bytes shared with the worker
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,6 +27,8 @@ services:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
     env_file: .env
+    volumes:
+      - ./data:/app/data  # document bytes shared with the api
     depends_on:
       postgres:
         condition: service_healthy
