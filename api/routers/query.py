@@ -20,7 +20,9 @@ from trust_rag.db.models import ClaimVerdict as ClaimVerdictEnum
 from trust_rag.db.models import QueryLog
 from trust_rag.db.session import get_session_factory
 from trust_rag.generation.llm import astream_answer, build_context
+from trust_rag.observability import flush, start_trace
 from trust_rag.retrieval.hybrid import RetrievedChunk, hybrid_search
+from trust_rag.settings import get_settings
 from trust_rag.verification.verifier import verify_answer
 
 router = APIRouter(prefix="/query", tags=["query"])
@@ -48,7 +50,14 @@ def _sse(event: str, payload: dict) -> str:
 @router.post("")
 async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> StreamingResponse:
     started = time.monotonic()
+    trace = start_trace(
+        name="query", input=body.question, user_id=str(ctx.user_id or ctx.tenant_id)
+    )
+    retrieval_span = trace.span(name="hybrid-retrieval", input=body.question)
     chunks = await hybrid_search(session, ctx.tenant_id, body.question, top_k=body.top_k)
+    retrieval_span.end(
+        output=[{"chunk_id": str(c.id), "rrf_score": c.rrf_score} for c in chunks]
+    )
     citations = [_citation(i + 1, c) for i, c in enumerate(chunks)]
 
     async def stream() -> AsyncIterator[str]:
@@ -72,15 +81,25 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
         yield _sse("retrieved", {"citations": [c.model_dump(mode="json") for c in citations]})
 
         context = build_context(chunks)
+        generation_span = trace.generation(
+            name="grounded-answer",
+            input={"question": body.question, "context": context},
+            model=get_settings().generation_model,
+        )
         async for token in astream_answer(body.question, context):
             answer_parts.append(token)
             yield _sse("token", {"text": token})
 
         answer = "".join(answer_parts)
+        generation_span.end(output=answer)
         latency_ms = int((time.monotonic() - started) * 1000)
 
         # Trust layer: verify each claim against the retrieved evidence.
+        verification_span = trace.span(name="claim-verification", input=answer)
         verification = await verify_answer(answer, chunks)
+        verification_span.end(
+            output={"confidence": verification.confidence, "abstain": verification.abstain}
+        )
         yield _sse(
             "claims",
             {
@@ -129,6 +148,11 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
             )
             await log_session.commit()
 
+        trace.update(
+            output=final_answer,
+            metadata={"confidence": verification.confidence, "abstain": verification.abstain},
+        )
+        flush()
         yield _sse(
             "done",
             {

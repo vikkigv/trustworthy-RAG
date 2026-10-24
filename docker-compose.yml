@@ -50,11 +50,33 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trust_rag"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  langfuse:
+    # v2: single container, reuses our Postgres + Redis (v3 would need
+    # ClickHouse + MinIO — overkill for a 4 GB dev VM).
+    image: langfuse/langfuse:2
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://trust_rag:trust_rag_dev@postgres:5432/langfuse
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: trustrag-dev-nextauth-secret
+      SALT: trustrag-dev-salt
+      TELEMETRY_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
   pgadmin:
     image: dpage/pgadmin4:8
@@ -75,12 +97,6 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-
-  # Langfuse self-host requires ClickHouse + MinIO (v3).
-  # Attach the official stack instead of duplicating it here:
-  #   curl -L https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml -o infra/langfuse/docker-compose.yml
-  #   docker compose -f infra/langfuse/docker-compose.yml up -d
-  # Then set LANGFUSE_ENABLED=true in .env (see docs/langfuse.md).
 
 volumes:
   pgdata:
