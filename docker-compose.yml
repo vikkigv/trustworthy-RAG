@@ -10,6 +10,7 @@ services:
       REDIS_HOST: redis
       LLM_API_BASE: http://host.docker.internal:11434/v1
       EMBEDDING_API_BASE: http://host.docker.internal:11434/v1
+      LANGFUSE_HOST: http://host.docker.internal:3000
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the worker
@@ -30,6 +31,7 @@ services:
       REDIS_HOST: redis
       LLM_API_BASE: http://host.docker.internal:11434/v1
       EMBEDDING_API_BASE: http://host.docker.internal:11434/v1
+      LANGFUSE_HOST: http://host.docker.internal:3000
     env_file: .env
     volumes:
       - ./data:/app/data  # document bytes shared with the api
