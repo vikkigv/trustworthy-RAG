@@ -15,6 +15,8 @@ Q: What is the stock options vesting schedule?
    abstained · the corpus says nothing about stock options
 ```
 
+![demo](docs/demo.gif)
+
 ## What makes it different
 
 | Feature | What it means here |
