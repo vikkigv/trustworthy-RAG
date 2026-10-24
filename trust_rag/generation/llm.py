@@ -5,7 +5,9 @@ is a settings change away. Streaming is the norm; callers reassemble tokens.
 """
 
 from collections.abc import AsyncIterator
+from typing import Any
 
+import litellm
 from litellm import acompletion
 
 from trust_rag.settings import get_settings
@@ -17,6 +19,42 @@ Rules:
   say: "I don't have enough information to answer this."
 - Cite passages inline like [1] or [2] after each claim you use.
 - Be concise and factual. Never invent policies, numbers, or names."""
+
+
+async def acomplete_json(
+    system: str, user: str, model: str | None = None
+) -> Any:
+    """Non-streaming LLM call that must answer with pure JSON.
+
+    Returns None if the model didn't produce parseable JSON — callers decide
+    how to degrade (verification treats a parse failure as unverifiable).
+    """
+    settings = get_settings()
+    response = await acompletion(
+        model=f"openai/{model or settings.verification_model}",
+        api_base=settings.llm_api_base,
+        api_key=settings.llm_api_key,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        response_format={"type": "json_object"},
+    )
+    text = response.choices[0].message.content or ""
+    import json
+
+    try:
+        return json.loads(_strip_json_fences(text))
+    except ValueError:
+        litellm.logger.warning("LLM returned unparseable JSON: %s", text[:200])
+        return None
+
+
+def _strip_json_fences(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.removeprefix("```json").removeprefix("```").removesuffix("```")
+    return t.strip()
 
 
 def build_context(chunks: list) -> str:

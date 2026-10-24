@@ -15,10 +15,13 @@ from fastapi.responses import StreamingResponse
 
 from api.core.deps import CurrentAuth, DbSession
 from api.schemas.query import Citation, QueryRequest
+from trust_rag.db.models import Claim as ClaimRow
+from trust_rag.db.models import ClaimVerdict as ClaimVerdictEnum
 from trust_rag.db.models import QueryLog
 from trust_rag.db.session import get_session_factory
 from trust_rag.generation.llm import astream_answer, build_context
 from trust_rag.retrieval.hybrid import RetrievedChunk, hybrid_search
+from trust_rag.verification.verifier import verify_answer
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -76,30 +79,64 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
         answer = "".join(answer_parts)
         latency_ms = int((time.monotonic() - started) * 1000)
 
+        # Trust layer: verify each claim against the retrieved evidence.
+        verification = await verify_answer(answer, chunks)
+        yield _sse(
+            "claims",
+            {
+                "claims": [
+                    {
+                        "text": c.text,
+                        "verdict": c.verdict,
+                        "supporting_chunk_ids": c.supporting_chunk_ids,
+                    }
+                    for c in verification.claims
+                ],
+                "abstain": verification.abstain,
+                "reason": verification.reason,
+            },
+        )
+
+        final_answer = (
+            "I don't have enough confidence in the retrieved evidence to answer. "
+            f"({verification.reason})" if verification.abstain else answer
+        )
+
         log = QueryLog(
             tenant_id=ctx.tenant_id,
             user_id=ctx.user_id,
             question=body.question,
-            answer=answer,
-            confidence=0.0,  # real scoring lands in v1 step 8 (verification)
+            answer=final_answer,
+            confidence=verification.confidence,
             latency_ms=latency_ms,
             retrieved_chunk_ids=[
                 {"chunk_id": str(c.id), "rrf_score": c.rrf_score} for c in chunks
             ],
         )
         # The request-scoped session is closed once streaming starts, so the
-        # log write uses its own short-lived session.
+        # writes below use their own short-lived session.
         async with get_session_factory()() as log_session:
             log_session.add(log)
+            await log_session.flush()
+            log_session.add_all(
+                ClaimRow(
+                    query_log_id=log.id,
+                    text=c.text,
+                    verdict=ClaimVerdictEnum(c.verdict),
+                    supporting_chunk_ids=c.supporting_chunk_ids,
+                )
+                for c in verification.claims
+            )
             await log_session.commit()
 
         yield _sse(
             "done",
             {
                 "query_log_id": str(log.id),
-                "answer": answer,
+                "answer": final_answer,
                 "citations": [c.model_dump(mode="json") for c in citations],
-                "confidence": 0.0,
+                "confidence": verification.confidence,
+                "abstain": verification.abstain,
             },
         )
 
