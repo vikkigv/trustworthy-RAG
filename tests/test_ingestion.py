@@ -6,13 +6,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from tests.test_auth import _get_token, _unique
 from trust_rag.db.models import Chunk, Document, DocumentStatus
 from trust_rag.ingestion.parsers import UnsupportedDocumentType
 from trust_rag.ingestion.pipeline import run_ingestion
-from trust_rag.settings import get_settings
 from trust_rag.storage import get_storage
 
 
@@ -28,18 +27,6 @@ def token(client) -> str:
     resp = client.post("/auth/register", json=creds)
     assert resp.status_code == 201, resp.text
     return _get_token(client, creds)
-
-
-@pytest.fixture()
-async def session_factory() -> async_sessionmaker:
-    """Session factory bound to the test's event loop.
-
-    The app lifespan engine belongs to the TestClient's loop and asyncpg
-    connections can't cross loops, so async tests use their own engine.
-    """
-    engine = create_async_engine(get_settings().database_url)
-    yield async_sessionmaker(engine, expire_on_commit=False)
-    await engine.dispose()
 
 
 @asynccontextmanager

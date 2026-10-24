@@ -107,3 +107,19 @@ def client():
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+async def session_factory():
+    """Session factory bound to the *test's* event loop.
+
+    The app lifespan engine belongs to the TestClient's loop and asyncpg
+    connections can't cross loops, so async tests use their own engine.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from trust_rag.settings import get_settings
+
+    engine = create_async_engine(get_settings().database_url)
+    yield async_sessionmaker(engine, expire_on_commit=False)
+    await engine.dispose()
