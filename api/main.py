@@ -4,7 +4,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI
 
-from api.routers import auth, documents, health
+from api.routers import auth, documents, health, query
 from trust_rag.db.session import dispose_engine, init_engine
 from trust_rag.settings import get_settings
 from trust_rag.storage import init_storage
@@ -31,3 +31,4 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(documents.router)
+app.include_router(query.router)

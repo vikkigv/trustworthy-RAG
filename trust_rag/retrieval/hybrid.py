@@ -99,7 +99,7 @@ async def hybrid_search(
             document_id=row.document_id,
             chunk_index=row.chunk_index,
             content=row.content,
-            rrf_score=row.rrf_score or 0.0,
+            rrf_score=float(row.rrf_score or 0.0),  # Decimal -> float for JSONB
             dense_rank=row.dense_rank,
             sparse_rank=row.sparse_rank,
         )
