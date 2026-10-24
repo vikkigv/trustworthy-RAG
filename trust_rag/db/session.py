@@ -33,6 +33,11 @@ async def dispose_engine() -> None:
     _session_factory = None
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    assert _session_factory is not None, "init_engine() must be called first"
+    return _session_factory
+
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     assert _session_factory is not None, "init_engine() must be called first"
     async with _session_factory() as session:

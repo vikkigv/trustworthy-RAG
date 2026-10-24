@@ -7,7 +7,7 @@ from arq.connections import RedisSettings
 from sqlalchemy import update
 
 from trust_rag.db.models import Document, DocumentStatus, IngestionJob, IngestionJobStatus
-from trust_rag.db.session import SessionFactory, dispose_engine, init_engine
+from trust_rag.db.session import dispose_engine, get_session_factory, init_engine
 from trust_rag.settings import get_settings
 
 
@@ -24,7 +24,8 @@ async def shutdown(ctx: dict) -> None:
 async def ingest_document(ctx: dict, document_id: str) -> None:
     """Mark the job running, delegate to the pipeline (step 5), record the outcome."""
     doc_uuid = UUID(document_id)
-    async with SessionFactory() as session:
+    sessions = get_session_factory()
+    async with sessions() as session:
         job = (
             await session.execute(
                 update(IngestionJob)
@@ -51,7 +52,7 @@ async def ingest_document(ctx: dict, document_id: str) -> None:
 
         await run_ingestion(doc_uuid)
     except NotImplementedError:
-        async with SessionFactory() as session:
+        async with sessions() as session:
             await session.execute(
                 update(Document)
                 .where(Document.id == doc_uuid)
@@ -59,7 +60,7 @@ async def ingest_document(ctx: dict, document_id: str) -> None:
             )
             await session.commit()
     except Exception as exc:
-        async with SessionFactory() as session:
+        async with sessions() as session:
             await session.execute(
                 update(IngestionJob)
                 .where(IngestionJob.id == job)
@@ -73,7 +74,7 @@ async def ingest_document(ctx: dict, document_id: str) -> None:
             await session.commit()
         raise
     else:
-        async with SessionFactory() as session:
+        async with sessions() as session:
             await session.execute(
                 update(IngestionJob)
                 .where(IngestionJob.id == job)
