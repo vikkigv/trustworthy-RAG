@@ -9,11 +9,13 @@ from sqlalchemy import update
 from trust_rag.db.models import Document, DocumentStatus, IngestionJob, IngestionJobStatus
 from trust_rag.db.session import dispose_engine, get_session_factory, init_engine
 from trust_rag.settings import get_settings
+from trust_rag.storage import init_storage
 
 
 async def startup(ctx: dict) -> None:
     settings = get_settings()
     init_engine(settings.database_url)
+    init_storage(settings.data_dir)
     ctx["settings"] = settings
 
 
@@ -47,18 +49,10 @@ async def ingest_document(ctx: dict, document_id: str) -> None:
         )
         await session.commit()
 
-    try:
-        from trust_rag.ingestion.pipeline import run_ingestion  # step 5 implements this
+    from trust_rag.ingestion.pipeline import run_ingestion
 
+    try:
         await run_ingestion(doc_uuid)
-    except NotImplementedError:
-        async with sessions() as session:
-            await session.execute(
-                update(Document)
-                .where(Document.id == doc_uuid)
-                .values(status=DocumentStatus.PENDING)
-            )
-            await session.commit()
     except Exception as exc:
         async with sessions() as session:
             await session.execute(
