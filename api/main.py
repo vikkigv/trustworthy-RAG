@@ -2,12 +2,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api.routers import health
+from api.routers import auth, health
+from trust_rag.db.session import dispose_engine, init_engine
+from trust_rag.settings import get_settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_engine(get_settings().database_url)
     yield
+    await dispose_engine()
 
 
 app = FastAPI(
@@ -18,3 +22,4 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)

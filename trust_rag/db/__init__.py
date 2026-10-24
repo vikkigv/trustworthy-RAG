@@ -14,7 +14,7 @@ from trust_rag.db.models import (
     Tenant,
     User,
 )
-from trust_rag.db.session import SessionFactory, engine, get_session
+from trust_rag.db.session import dispose_engine, get_session, init_engine
 
 __all__ = [
     "ApiKey",
@@ -29,9 +29,9 @@ __all__ = [
     "IngestionJob",
     "IngestionJobStatus",
     "QueryLog",
-    "SessionFactory",
     "Tenant",
     "User",
-    "engine",
+    "dispose_engine",
     "get_session",
+    "init_engine",
 ]

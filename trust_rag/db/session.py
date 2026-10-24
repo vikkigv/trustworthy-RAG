@@ -1,13 +1,39 @@
+"""Async engine lifecycle.
+
+The engine is created in the app/worker lifespan (not at import time) so its
+connection pool binds to a single event loop — creating it at import breaks
+under test runners that use a fresh loop per test.
+"""
+
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-from trust_rag.settings import get_settings
+_engine: AsyncEngine | None = None
+_session_factory: async_sessionmaker[AsyncSession] | None = None
 
-engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
-SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
+
+def init_engine(database_url: str) -> AsyncEngine:
+    global _engine, _session_factory
+    _engine = create_async_engine(database_url, pool_pre_ping=True)
+    _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+    return _engine
+
+
+async def dispose_engine() -> None:
+    global _engine, _session_factory
+    if _engine is not None:
+        await _engine.dispose()
+    _engine = None
+    _session_factory = None
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with SessionFactory() as session:
+    assert _session_factory is not None, "init_engine() must be called first"
+    async with _session_factory() as session:
         yield session
