@@ -130,7 +130,7 @@ Streaming protocol: SSE with typed events —
 
 ## Phased roadmap
 
-### v1 — Trustworthy pipeline (target: 4–6 weeks part-time)
+### v1 — Trustworthy pipeline — ✅ COMPLETE (2026-10-24, local; deploy split to 11b)
 1. Repo scaffold, Docker Compose (api, postgres+pgvector, redis, arq, langfuse), CI skeleton
 2. Auth: JWT + API keys, tenants
 3. Ingestion: upload → Arq job → parse (pypdf/python-docx) → chunk → embed → index (pgvector + tsvector)
@@ -139,7 +139,7 @@ Streaming protocol: SSE with typed events —
 6. Verification pass + confidence + abstention
 7. Langfuse tracing wired through every stage
 8. Golden dataset (~50 Q/A pairs over 2–3 sample doc sets) + RAGAS in CI
-9. Deploy: Terraform → AWS ECS Fargate + RDS; live URL; README with architecture diagram
+9. README + architecture docs (done); deploy split out — see 11b
 
 ### v2 — Platform depth
 - Dashboard: eval history, trace viewer, per-stage latency/cost
@@ -169,6 +169,11 @@ Streaming protocol: SSE with typed events —
 - MCP server exposing `rag.search`, `rag.get_document`, `rag.verify_claim` (shares core package)
 - Agent consumes external MCP servers as pluggable tools
 - Demo: query your RAG from Claude Desktop
+
+### 11b — Deploy (optional, ~$15–40/mo or free-tier)
+- Terraform → AWS ECS Fargate + RDS; live URL in README
+- Swap local Ollama for a hosted provider (Z.ai/OpenAI) via env
+- Free alternatives: Fly.io/Render free tier, Oracle Cloud free ARM
 
 ### Garnish (pick one, max)
 - Table-aware PDF extraction
