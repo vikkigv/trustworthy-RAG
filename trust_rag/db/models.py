@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from trust_rag.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
-EMBEDDING_DIM = 1536  # OpenAI text-embedding-3-small
+EMBEDDING_DIM = 2000  # Z.ai embedding-3; pgvector HNSW caps at 2000 dims
 
 
 # --- Enumerations (kept DB-backed for integrity + reporting) ---

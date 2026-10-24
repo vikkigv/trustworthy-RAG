@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,10 +19,10 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
-    openai_api_key: str = ""
-    generation_model: str = "gpt-4o-mini"
-    verification_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    z_ai_api_key: str = ""
+    generation_model: str = "zai/glm-4.6"
+    verification_model: str = "zai/glm-4.6"
+    embedding_model: str = "zai/embedding-3"
 
     langfuse_enabled: bool = False
     langfuse_public_key: str = ""
@@ -37,6 +38,11 @@ class Settings(BaseSettings):
         "text/markdown",
         "text/plain",
     )
+
+    def model_post_init(self, _context: object, /) -> None:
+        # LiteLLM reads provider keys from the environment.
+        if self.z_ai_api_key:
+            os.environ.setdefault("Z_AI_API_KEY", self.z_ai_api_key)
 
     @property
     def database_url(self) -> str:

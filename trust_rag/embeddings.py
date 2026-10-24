@@ -8,7 +8,8 @@ from litellm import aembedding
 
 from trust_rag.settings import get_settings
 
-BATCH_SIZE = 100  # OpenAI embedding API limit is 2048 inputs; 100 keeps payloads sane
+BATCH_SIZE = 100  # keep request payloads sane
+EMBEDDING_DIM = 2000  # must match chunks.embedding; pgvector HNSW caps at 2000
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
@@ -18,6 +19,8 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     vectors: list[list[float]] = []
     for start in range(0, len(texts), BATCH_SIZE):
         batch = texts[start : start + BATCH_SIZE]
-        response = await aembedding(model=settings.embedding_model, input=batch)
+        response = await aembedding(
+            model=settings.embedding_model, input=batch, dimensions=EMBEDDING_DIM
+        )
         vectors.extend(item["embedding"] for item in response.data)
     return vectors
