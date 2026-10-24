@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format compose-up compose-down worker migrate revision
+.PHONY: install dev test lint format compose-up compose-down worker migrate revision eval
 
 migrate:
 	uv run alembic upgrade head
@@ -27,6 +27,9 @@ compose-up:
 
 compose-down:
 	docker compose down
+
+eval:
+	uv run python -m trust_rag.eval.run
 
 worker:
 	uv run arq trust_rag.worker.WorkerSettings

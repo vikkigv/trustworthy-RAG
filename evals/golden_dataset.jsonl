@@ -1,0 +1,16 @@
+{"id": "q01", "category": "answerable", "question": "How many vacation days can be carried over to the next year?", "expected_keywords": ["five", "5"], "expected_doc": "employee_handbook.md"}
+{"id": "q02", "category": "answerable", "question": "When do carried-over vacation days expire?", "expected_keywords": ["March 31"], "expected_doc": "employee_handbook.md"}
+{"id": "q03", "category": "answerable", "question": "When is a doctor's note required for sick leave?", "expected_keywords": ["three consecutive"], "expected_doc": "employee_handbook.md"}
+{"id": "q04", "category": "answerable", "question": "What are the core collaboration hours for remote work?", "expected_keywords": ["11:00", "16:00"], "expected_doc": "employee_handbook.md"}
+{"id": "q05", "category": "answerable", "question": "How is overtime compensated on weekends?", "expected_keywords": ["2.0"], "expected_doc": "employee_handbook.md"}
+{"id": "q06", "category": "answerable", "question": "How often must passwords be rotated?", "expected_keywords": ["180"], "expected_doc": "security_policy.md"}
+{"id": "q07", "category": "answerable", "question": "Within how many hours must a lost laptop be reported?", "expected_keywords": ["24"], "expected_doc": "security_policy.md"}
+{"id": "q08", "category": "answerable", "question": "Who must approve sharing restricted customer data externally?", "expected_keywords": ["CISO"], "expected_doc": "security_policy.md"}
+{"id": "q09", "category": "answerable", "question": "What is the annual learning budget per employee?", "expected_keywords": ["1,500"], "expected_doc": "benefits.md"}
+{"id": "q10", "category": "answerable", "question": "How long is paid parental leave for primary caregivers?", "expected_keywords": ["16 weeks"], "expected_doc": "benefits.md"}
+{"id": "q11", "category": "answerable", "question": "What percentage of health insurance premiums does the company cover for employees?", "expected_keywords": ["90"], "expected_doc": "benefits.md"}
+{"id": "q12", "category": "answerable", "question": "How far in advance must sabbatical applications be submitted?", "expected_keywords": ["90 days"], "expected_doc": "benefits.md"}
+{"id": "q13", "category": "unanswerable", "question": "What is the stock options vesting schedule?", "expected_keywords": [], "expected_doc": null}
+{"id": "q14", "category": "unanswerable", "question": "How do I book a meeting room in the Berlin office?", "expected_keywords": [], "expected_doc": null}
+{"id": "q15", "category": "unanswerable", "question": "What is the company's revenue for last quarter?", "expected_keywords": [], "expected_doc": null}
+{"id": "q16", "category": "unanswerable", "question": "Who is the designated first-aid officer on each floor?", "expected_keywords": [], "expected_doc": null}
