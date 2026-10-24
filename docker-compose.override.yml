@@ -1,0 +1,15 @@
+# Development overrides — auto-loaded by `docker compose up`.
+# Reloads the API and worker on any source change (no rebuild needed).
+
+services:
+  api:
+    command: ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./api:/app/api
+      - ./trust_rag:/app/trust_rag
+
+  worker:
+    command: ["uv", "run", "arq", "trust_rag.worker.WorkerSettings", "--watch", "trust_rag"]
+    volumes:
+      - ./api:/app/api
+      - ./trust_rag:/app/trust_rag
