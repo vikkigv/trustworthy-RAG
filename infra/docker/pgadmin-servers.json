@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "trust_rag",
+      "Group": "Development",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "trust_rag",
+      "Username": "trust_rag",
+      "Password": "trust_rag_dev",
+      "SSLMode": "prefer"
+    }
+  }
+}
