@@ -1,4 +1,10 @@
-.PHONY: install dev test lint format compose-up compose-down worker
+.PHONY: install dev test lint format compose-up compose-down worker migrate revision
+
+migrate:
+	uv run alembic upgrade head
+
+revision:
+	uv run alembic revision --autogenerate -m "$(m)"
 
 install:
 	uv sync --extra dev
