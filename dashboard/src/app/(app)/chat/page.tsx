@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Citation, ClaimVerdict, streamQuery } from "@/lib/api";
 import DatePickerPopover from "@/components/DatePickerPopover";
 
@@ -17,13 +17,37 @@ interface Turn {
   currentCitations: Citation[];
 }
 
+const HISTORY_KEY = "trustrag_chat_history";
+
+function loadHistory(): Turn[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Turn[]) : [];
+    // A save mid-stream leaves a dangling turn; drop any that never finished.
+    return Array.isArray(parsed) ? parsed.filter((t) => !t.streaming) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function ChatPage() {
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(loadHistory);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [asOf, setAsOf] = useState("");
   const [selectedCite, setSelectedCite] = useState<number | null>(null);
+  // Which turn the Sources panel shows: null = follow the latest.
+  const [activeTurn, setActiveTurn] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(turns));
+    } catch {
+      // Quota exceeded or private mode — history just won't persist.
+    }
+  }, [turns]);
 
   async function askFull(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +55,8 @@ export default function ChatPage() {
     if (!question || busy) return;
     setInput("");
     setBusy(true);
+    setSelectedCite(null);
+    setActiveTurn(null);
 
     setTurns((t) => [
       ...t,
@@ -69,6 +95,11 @@ export default function ChatPage() {
     }
   }
 
+  // The turn whose citations the Sources panel shows: a clicked turn, else the latest.
+  const shownTurn =
+    activeTurn !== null ? turns[activeTurn] : turns.length ? turns[turns.length - 1] : undefined;
+  const shownCitations = shownTurn?.citations ?? [];
+
   return (
     <div className="flex h-screen">
       {/* Chat column */}
@@ -78,6 +109,22 @@ export default function ChatPage() {
           <span className="ml-3 text-xs rounded-full px-2 py-0.5" style={{ color: "var(--green)", background: "rgba(52,211,153,0.1)" }}>
             every claim verified
           </span>
+          {turns.length > 0 && (
+            <button
+              type="button"
+              className="ml-auto text-xs rounded-lg px-2 py-1 transition-colors hover:text-[var(--fg,#e5e7eb)]"
+              style={{ color: "var(--muted)" }}
+              onClick={() => {
+                if (busy) return;
+                setTurns([]);
+                setActiveTurn(null);
+                setSelectedCite(null);
+                localStorage.removeItem(HISTORY_KEY);
+              }}
+            >
+              Clear chat
+            </button>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 max-w-3xl w-full mx-auto">
@@ -93,7 +140,17 @@ export default function ChatPage() {
           )}
 
           {turns.map((turn, i) => (
-            <div key={i} className="space-y-4">
+            <div
+              key={i}
+              className={`space-y-4 rounded-2xl -mx-3 px-3 py-2 transition-colors cursor-pointer ${turn.streaming ? "" : "hover:bg-white/[0.02]"}`}
+              style={
+                !turn.streaming && (activeTurn === i || (activeTurn === null && i === turns.length - 1))
+                  ? { background: "rgba(124,108,255,0.05)", boxShadow: "inset 2px 0 0 var(--accent)" }
+                  : undefined
+              }
+              onClick={() => !turn.streaming && setActiveTurn(activeTurn === i ? null : i)}
+              title="Click to show this turn's sources in the panel"
+            >
               {/* Question */}
               <div className="flex justify-end items-center gap-2">
                 {turn.asOf && (
@@ -179,16 +236,23 @@ export default function ChatPage() {
 
       {/* Citations panel */}
       <aside className="w-96 shrink-0 border-l overflow-y-auto" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-        <div className="h-14 border-b flex items-center px-5 text-sm font-medium" style={{ borderColor: "var(--border)" }}>
+        <div className="h-14 border-b flex items-center px-5 text-sm font-medium shrink-0" style={{ borderColor: "var(--border)" }}>
           Sources
+          {shownTurn && (
+            <span className="ml-2 truncate text-xs font-normal" style={{ color: "var(--muted)" }} title={shownTurn.question}>
+              for “{shownTurn.question}”
+            </span>
+          )}
         </div>
         <div className="p-4 space-y-3">
-          {lastCitations(turns).length === 0 && (
+          {shownCitations.length === 0 && (
             <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Retrieved passages appear here — before the answer finishes streaming.
+              {shownTurn
+                ? "No passages were retrieved for this question."
+                : "Retrieved passages appear here — before the answer finishes streaming."}
             </p>
           )}
-          {lastCitations(turns).map((c) => (
+          {shownCitations.map((c) => (
             <button
               key={c.number}
               onClick={() => setSelectedCite(selectedCite === c.number ? null : c.number)}
@@ -228,7 +292,7 @@ function renderAnswer(turn: Turn, onSelect: (n: number) => void): React.ReactNod
   if (!turn.claims.length) {
     return text.split(/(\[\d+\])/g).map((part, i) =>
       /^\[\d+\]$/.test(part) ? (
-        <sup key={i} onClick={() => onSelect(parseInt(part.slice(1, -1)))}
+        <sup key={i} onClick={(e) => { e.stopPropagation(); onSelect(parseInt(part.slice(1, -1))); }}
             className="cursor-pointer ml-0.5 font-mono text-[11px]" style={{ color: "var(--accent)" }}>
           {part}
         </sup>
@@ -262,11 +326,6 @@ function renderAnswer(turn: Turn, onSelect: (n: number) => void): React.ReactNod
 
 function fmtDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString() : "?";
-}
-
-function lastCitations(turns: Turn[]): Citation[] {
-  for (let i = turns.length - 1; i >= 0; i--) if (turns[i].citations.length) return turns[i].citations;
-  return [];
 }
 
 function LegBadge({ active, label }: { active: boolean; label: string }) {

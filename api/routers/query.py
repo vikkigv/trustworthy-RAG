@@ -8,6 +8,7 @@ SSE protocol (one JSON payload per event):
 
 import datetime as dt
 import json
+import logging
 import time
 from collections.abc import AsyncIterator
 
@@ -24,6 +25,8 @@ from trust_rag.generation.llm import astream_answer, build_context
 from trust_rag.observability import flush, start_trace
 from trust_rag.retrieval.hybrid import RetrievedChunk, hybrid_search
 from trust_rag.settings import get_settings
+
+logger = logging.getLogger(__name__)
 from trust_rag.verification.verifier import verify_answer
 
 router = APIRouter(prefix="/query", tags=["query"])
@@ -147,20 +150,25 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
             ],
         )
         # The request-scoped session is closed once streaming starts, so the
-        # writes below use their own short-lived session.
-        async with get_session_factory()() as log_session:
-            log_session.add(log)
-            await log_session.flush()
-            log_session.add_all(
-                ClaimRow(
-                    query_log_id=log.id,
-                    text=c.text,
-                    verdict=ClaimVerdictEnum(c.verdict),
-                    supporting_chunk_ids=c.supporting_chunk_ids,
+        # writes below use their own short-lived session. Logging is best-effort:
+        # a failed write (e.g. the user row vanished mid-session) must never
+        # break the stream and cost the user their answer.
+        try:
+            async with get_session_factory()() as log_session:
+                log_session.add(log)
+                await log_session.flush()
+                log_session.add_all(
+                    ClaimRow(
+                        query_log_id=log.id,
+                        text=c.text,
+                        verdict=ClaimVerdictEnum(c.verdict),
+                        supporting_chunk_ids=c.supporting_chunk_ids,
+                    )
+                    for c in verification.claims
                 )
-                for c in verification.claims
-            )
-            await log_session.commit()
+                await log_session.commit()
+        except Exception:
+            logger.exception("query log write failed — answer still delivered to client")
 
         # Temporal mode: compare with current knowledge so changed policies
         # can be surfaced (old answer vs what's true now).
