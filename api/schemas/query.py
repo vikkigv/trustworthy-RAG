@@ -4,11 +4,20 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class ChatTurn(BaseModel):
+    """One prior turn sent by the client for follow-up rewriting."""
+    question: str = Field(min_length=1, max_length=2000)
+    answer: str = Field(default="", max_length=2000)
+
+
 class QueryRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
     top_k: int = Field(default=8, ge=1, le=20)
     # Temporal mode: answer as of this instant (ISO 8601 date/datetime).
     as_of: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}([T ].*)?$")
+    # Recent conversation (oldest first) so follow-ups like "what about X?"
+    # can be rewritten into standalone questions before retrieval.
+    history: list[ChatTurn] = Field(default_factory=list, max_length=10)
 
 
 class Citation(BaseModel):

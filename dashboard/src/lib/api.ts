@@ -76,12 +76,19 @@ export interface QueryEvents {
   answer: string;
   query_log_id: string | null;
   currentCitations: Citation[];
+  searchedAs: string | null;
+}
+
+export interface HistoryTurn {
+  question: string;
+  answer: string;
 }
 
 export async function streamQuery(
   question: string,
   onToken: (t: string) => void,
-  asOf?: string | null
+  asOf?: string | null,
+  history?: HistoryTurn[]
 ): Promise<QueryEvents> {
   const res = await fetch(`${API_URL}/query`, {
     method: "POST",
@@ -89,7 +96,11 @@ export async function streamQuery(
       "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ question, ...(asOf ? { as_of: asOf } : {}) }),
+    body: JSON.stringify({
+      question,
+      ...(asOf ? { as_of: asOf } : {}),
+      ...(history?.length ? { history: history.slice(-4) } : {}),
+    }),
   });
   if (!res.ok || !res.body) throw new Error(`query failed: ${res.status}`);
 
@@ -103,6 +114,7 @@ export async function streamQuery(
     answer: "",
     query_log_id: null,
     currentCitations: [],
+    searchedAs: null,
   };
   let currentEvent = "";
 
@@ -153,6 +165,7 @@ function handleEvent(
       events.confidence = data.confidence;
       events.query_log_id = data.query_log_id;
       events.currentCitations = data.current_citations ?? [];
+      events.searchedAs = data.searched_as ?? null;
       // early-abstain path (no chunks) omits the flag; infer it
       events.abstain = Boolean(data.abstain) || events.retrieved.length === 0;
       break;

@@ -21,7 +21,7 @@ from trust_rag.db.models import Claim as ClaimRow
 from trust_rag.db.models import ClaimVerdict as ClaimVerdictEnum
 from trust_rag.db.models import QueryLog
 from trust_rag.db.session import get_session_factory
-from trust_rag.generation.llm import astream_answer, build_context
+from trust_rag.generation.llm import astream_answer, build_context, rewrite_followup
 from trust_rag.observability import flush, start_trace
 from trust_rag.retrieval.hybrid import RetrievedChunk, hybrid_search
 from trust_rag.settings import get_settings
@@ -68,9 +68,26 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
     trace = start_trace(
         name="query", input=body.question, user_id=str(ctx.user_id or ctx.tenant_id)
     )
-    retrieval_span = trace.span(name="hybrid-retrieval", input=body.question)
+
+    # Follow-up rewriting: resolve "what about X?" against recent turns so
+    # retrieval and generation see a self-contained question.
+    search_question = body.question
+    if body.history:
+        rewrite_span = trace.span(name="followup-rewrite", input=body.question)
+        try:
+            rewritten = await rewrite_followup(
+                body.question, [t.model_dump() for t in body.history]
+            )
+        except Exception:
+            logger.exception("follow-up rewrite failed — querying with raw question")
+            rewritten = None
+        if rewritten and rewritten.lower() != body.question.lower():
+            search_question = rewritten
+        rewrite_span.end(output={"standalone_question": search_question})
+
+    retrieval_span = trace.span(name="hybrid-retrieval", input=search_question)
     chunks = await hybrid_search(
-        session, ctx.tenant_id, body.question, top_k=body.top_k, as_of=as_of
+        session, ctx.tenant_id, search_question, top_k=body.top_k, as_of=as_of
     )
     retrieval_span.end(
         output=[{"chunk_id": str(c.id), "rrf_score": c.rrf_score} for c in chunks]
@@ -100,10 +117,10 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
         context = build_context(chunks)
         generation_span = trace.generation(
             name="grounded-answer",
-            input={"question": body.question, "context": context},
+            input={"question": search_question, "context": context},
             model=get_settings().generation_model,
         )
-        async for token in astream_answer(body.question, context):
+        async for token in astream_answer(search_question, context):
             answer_parts.append(token)
             yield _sse("token", {"text": token})
 
@@ -198,6 +215,7 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
                 "confidence": verification.confidence,
                 "abstain": verification.abstain,
                 "as_of": body.as_of,
+                "searched_as": search_question if search_question != body.question else None,
                 "current_citations": current_citations,
             },
         )

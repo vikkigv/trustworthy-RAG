@@ -133,8 +133,9 @@ export default function DashboardPage() {
         {queries.length === 0 ? (
           <p className="text-xs p-8 text-center" style={{ color: "var(--muted)" }}>No queries yet — ask something in Chat.</p>
         ) : (
+          <div className="overflow-y-auto max-h-80">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0" style={{ background: "var(--panel)" }}>
               <tr className="text-left text-xs" style={{ color: "var(--muted)" }}>
                 <th className="px-6 py-2.5 font-normal">Question</th>
                 <th className="px-3 py-2.5 font-normal">Confidence</th>
@@ -162,6 +163,7 @@ export default function DashboardPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

@@ -15,6 +15,7 @@ interface Turn {
   confidence: number;
   asOf?: string | null;
   currentCitations: Citation[];
+  searchedAs?: string | null;
 }
 
 const HISTORY_KEY = "trustrag_chat_history";
@@ -69,14 +70,21 @@ export default function ChatPage() {
 
     setTurns((t) => [
       ...t,
-      { question, streaming: true, answerText: "", citations: [], claims: [], abstain: false, reason: null, confidence: 0, asOf: asOf || null, currentCitations: [] },
+      { question, streaming: true, answerText: "", citations: [], claims: [], abstain: false, reason: null, confidence: 0, asOf: asOf || null, currentCitations: [], searchedAs: null },
     ]);
+
+    // Send finished turns so the backend can rewrite follow-ups into
+    // standalone questions ("what about sick leave?" → full question).
+    const history = turns
+      .filter((t) => !t.streaming)
+      .slice(-4)
+      .map((t) => ({ question: t.question, answer: t.answerText.slice(0, 300) }));
 
     try {
       const events = await streamQuery(question, (tok) =>
         setTurns((t) =>
           t.map((x, i) => (i === t.length - 1 ? { ...x, answerText: x.answerText + tok, citations: x.citations } : x))
-        ), asOf || null
+        ), asOf || null, history
       );
       setTurns((t) =>
         t.map((x, i) =>
@@ -89,6 +97,7 @@ export default function ChatPage() {
                 abstain: events.abstain,
                 reason: events.reason,
                 confidence: events.confidence,
+                searchedAs: events.searchedAs,
                 streaming: false,
               }
             : x
@@ -190,6 +199,11 @@ export default function ChatPage() {
 
               {/* Answer */}
               <div className="space-y-3">
+                {!turn.streaming && turn.searchedAs && (
+                  <div className="text-[11px] font-mono" style={{ color: "var(--muted)" }} title="Your follow-up was rewritten into a standalone question for document search.">
+                    ↳ searched as: “{turn.searchedAs}”
+                  </div>
+                )}
                 {turn.abstain ? (
                   <div className="rounded-xl border px-4 py-3 text-sm"
                        style={{ borderColor: "rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.06)", color: "var(--amber)" }}>

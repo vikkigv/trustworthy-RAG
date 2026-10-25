@@ -65,6 +65,41 @@ def build_context(chunks: list) -> str:
     )
 
 
+REWRITE_SYSTEM_PROMPT = """You rewrite a follow-up question into a standalone question for document search.
+
+Given the recent conversation and the user's latest question, resolve pronouns
+and missing context ("it", "that policy", "what about X") so the rewritten
+question can be understood with NO conversation history.
+
+Rules:
+- If the question is already standalone, return it unchanged.
+- Keep the user's intent; add only what the conversation supplies.
+- Output JSON: {"standalone_question": "..."}"""
+
+
+async def rewrite_followup(
+    question: str, history: list[dict[str, str]], model: str | None = None
+) -> str | None:
+    """Rewrite a follow-up into a standalone question using recent turns.
+
+    History is a list of {"question", "answer"} dicts, oldest first. Returns
+    None when the model doesn't cooperate — callers fall back to the raw
+    question (retrieval still works, just degraded for heavy ellipsis).
+    """
+    transcript = "\n".join(
+        f"Q: {turn['question']}\nA: {turn['answer'][:300]}" for turn in history[-4:]
+    )
+    result = await acomplete_json(
+        REWRITE_SYSTEM_PROMPT,
+        f"Recent conversation:\n{transcript}\n\nLatest question: {question}",
+        model=model,
+    )
+    if not isinstance(result, dict):
+        return None
+    rewritten = result.get("standalone_question")
+    return rewritten.strip() if isinstance(rewritten, str) and rewritten.strip() else None
+
+
 async def astream_answer(
     question: str, context: str, model: str | None = None
 ) -> AsyncIterator[str]:
