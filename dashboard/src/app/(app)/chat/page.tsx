@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Citation, ClaimVerdict, streamQuery } from "@/lib/api";
+import DatePickerPopover from "@/components/DatePickerPopover";
 
 interface Turn {
   question: string;
@@ -166,19 +167,7 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               disabled={busy}
             />
-            <input
-              type="date"
-              title="Time travel — answer as of this date"
-              className="bg-transparent text-xs outline-none cursor-pointer"
-              style={{ color: asOf ? "var(--cyan)" : "var(--muted)" }}
-              value={asOf}
-              onChange={(e) => setAsOf(e.target.value)}
-              disabled={busy}
-            />
-            {asOf && (
-              <button type="button" onClick={() => setAsOf("")}
-                      className="text-xs" style={{ color: "var(--muted)" }} title="Clear date">✕</button>
-            )}
+            <DatePickerPopover value={asOf} onChange={setAsOf} disabled={busy} />
             <button type="submit" disabled={busy || !input.trim()}
                     className="ml-2 rounded-xl px-3.5 py-1.5 text-white text-sm disabled:opacity-40"
                     style={{ background: "linear-gradient(135deg, #7c6cff, #4f46e5)" }}>
