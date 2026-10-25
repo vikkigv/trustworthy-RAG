@@ -55,6 +55,9 @@ export interface Citation {
   rrf_score: number;
   dense_rank: number | null;
   sparse_rank: number | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean;
 }
 
 export interface ClaimVerdict {
@@ -72,11 +75,13 @@ export interface QueryEvents {
   confidence: number;
   answer: string;
   query_log_id: string | null;
+  currentCitations: Citation[];
 }
 
 export async function streamQuery(
   question: string,
-  onToken: (t: string) => void
+  onToken: (t: string) => void,
+  asOf?: string | null
 ): Promise<QueryEvents> {
   const res = await fetch(`${API_URL}/query`, {
     method: "POST",
@@ -84,7 +89,7 @@ export async function streamQuery(
       "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, ...(asOf ? { as_of: asOf } : {}) }),
   });
   if (!res.ok || !res.body) throw new Error(`query failed: ${res.status}`);
 
@@ -97,6 +102,7 @@ export async function streamQuery(
     confidence: 0,
     answer: "",
     query_log_id: null,
+    currentCitations: [],
   };
   let currentEvent = "";
 
@@ -146,7 +152,9 @@ function handleEvent(
       events.answer = data.answer;
       events.confidence = data.confidence;
       events.query_log_id = data.query_log_id;
-      if (data.abstain) events.abstain = true;
+      events.currentCitations = data.current_citations ?? [];
+      // early-abstain path (no chunks) omits the flag; infer it
+      events.abstain = Boolean(data.abstain) || events.retrieved.length === 0;
       break;
   }
 }

@@ -12,12 +12,15 @@ interface Turn {
   abstain: boolean;
   reason: string | null;
   confidence: number;
+  asOf?: string | null;
+  currentCitations: Citation[];
 }
 
 export default function ChatPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [asOf, setAsOf] = useState("");
   const [selectedCite, setSelectedCite] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -30,14 +33,14 @@ export default function ChatPage() {
 
     setTurns((t) => [
       ...t,
-      { question, streaming: true, answerText: "", citations: [], claims: [], abstain: false, reason: null, confidence: 0 },
+      { question, streaming: true, answerText: "", citations: [], claims: [], abstain: false, reason: null, confidence: 0, asOf: asOf || null, currentCitations: [] },
     ]);
 
     try {
       const events = await streamQuery(question, (tok) =>
         setTurns((t) =>
           t.map((x, i) => (i === t.length - 1 ? { ...x, answerText: x.answerText + tok, citations: x.citations } : x))
-        )
+        ), asOf || null
       );
       setTurns((t) =>
         t.map((x, i) =>
@@ -45,6 +48,7 @@ export default function ChatPage() {
             ? {
                 ...x,
                 citations: events.retrieved,
+                currentCitations: events.currentCitations,
                 claims: events.claims,
                 abstain: events.abstain,
                 reason: events.reason,
@@ -90,7 +94,13 @@ export default function ChatPage() {
           {turns.map((turn, i) => (
             <div key={i} className="space-y-4">
               {/* Question */}
-              <div className="flex justify-end">
+              <div className="flex justify-end items-center gap-2">
+                {turn.asOf && (
+                  <span className="text-[10px] font-mono rounded-full px-2 py-1"
+                        style={{ color: "var(--cyan)", background: "rgba(34,211,238,0.1)" }}>
+                    as of {turn.asOf}
+                  </span>
+                )}
                 <div className="rounded-2xl rounded-br-md px-4 py-2.5 text-sm max-w-[80%] text-white"
                      style={{ background: "linear-gradient(135deg, #7c6cff, #4f46e5)" }}>
                   {turn.question}
@@ -109,6 +119,19 @@ export default function ChatPage() {
                 ) : (
                   <div className={`text-[15px] leading-7 whitespace-pre-wrap ${turn.streaming ? "token" : ""}`}>
                     {renderAnswer(turn, setSelectedCite)}
+                  </div>
+                )}
+
+                {/* Temporal: policy changed since the as_of date */}
+                {!turn.streaming && turn.currentCitations.length > 0 && (
+                  <div className="rounded-xl border px-4 py-3 text-sm"
+                       style={{ borderColor: "rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.06)" }}>
+                    <div className="mb-1.5" style={{ color: "var(--cyan)" }}>⏱ Changed since then</div>
+                    {turn.currentCitations.map((c, i) => (
+                      <div key={i} className="text-xs leading-5" style={{ color: "var(--muted)" }}>
+                        Current version says: “{c.snippet.slice(0, 140)}…”
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -135,7 +158,7 @@ export default function ChatPage() {
 
         {/* Input */}
         <form onSubmit={askFull} className="p-4 max-w-3xl w-full mx-auto">
-          <div className="rounded-2xl border flex items-center px-4 py-1" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
+          <div className="rounded-2xl border flex items-center px-4 py-1 gap-2" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
             <input
               className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-[var(--muted)]"
               placeholder={busy ? "Thinking…" : "Ask a question — try something your documents answer"}
@@ -143,6 +166,19 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               disabled={busy}
             />
+            <input
+              type="date"
+              title="Time travel — answer as of this date"
+              className="bg-transparent text-xs outline-none cursor-pointer"
+              style={{ color: asOf ? "var(--cyan)" : "var(--muted)" }}
+              value={asOf}
+              onChange={(e) => setAsOf(e.target.value)}
+              disabled={busy}
+            />
+            {asOf && (
+              <button type="button" onClick={() => setAsOf("")}
+                      className="text-xs" style={{ color: "var(--muted)" }} title="Clear date">✕</button>
+            )}
             <button type="submit" disabled={busy || !input.trim()}
                     className="ml-2 rounded-xl px-3.5 py-1.5 text-white text-sm disabled:opacity-40"
                     style={{ background: "linear-gradient(135deg, #7c6cff, #4f46e5)" }}>
@@ -184,6 +220,11 @@ export default function ChatPage() {
               </p>
               <div className="mt-2 font-mono text-[10px]" style={{ color: "var(--muted)" }}>
                 rrf {c.rrf_score.toFixed(4)} · chunk #{c.chunk_index}
+                {!c.is_current && (
+                  <span style={{ color: "var(--cyan)" }}>
+                    {" "}· historical ({fmtDate(c.valid_from)} → {fmtDate(c.valid_to)})
+                  </span>
+                )}
               </div>
             </button>
           ))}
@@ -228,6 +269,10 @@ function renderAnswer(turn: Turn, onSelect: (n: number) => void): React.ReactNod
     parts = next;
   }
   return parts;
+}
+
+function fmtDate(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString() : "?";
 }
 
 function lastCitations(turns: Turn[]): Citation[] {
