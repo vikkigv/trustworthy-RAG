@@ -6,7 +6,7 @@ insert), so a failed run can simply be retried by enqueuing the job again.
 
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from trust_rag.db.models import Chunk, Document
 from trust_rag.db.session import get_session_factory
@@ -51,5 +51,19 @@ async def run_ingestion(document_id: UUID) -> int:
             for chunk, vector in zip(chunks, vectors, strict=True)
         ]
         session.add_all([Chunk(**row) for row in rows])
+
+        # Temporal versioning: if this document supersedes an older version,
+        # close the predecessor's chunks at the same instant ours open —
+        # "as of" queries before the cutover see the old text, after see ours.
+        if document.supersedes_id is not None:
+            await session.execute(
+                update(Chunk)
+                .where(
+                    Chunk.document_id == document.supersedes_id,
+                    Chunk.valid_to.is_(None),
+                )
+                .values(valid_to=now)
+            )
+
         await session.commit()
         return len(rows)

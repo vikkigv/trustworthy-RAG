@@ -4,6 +4,7 @@ Tenant isolation is enforced inside the SQL — both CTEs filter on tenant_id
 before any ranking happens, so a chunk from another tenant can never surface.
 """
 
+import datetime as dt
 import uuid
 from dataclasses import dataclass
 
@@ -42,10 +43,17 @@ _SEARCH_SQL = text(
            c.content,
            COALESCE(1.0 / (:rrf_k + d.rank), 0) + COALESCE(1.0 / (:rrf_k + s.rank), 0) AS rrf_score,
            d.rank AS dense_rank,
-           s.rank AS sparse_rank
+           s.rank AS sparse_rank,
+           c.valid_from,
+           c.valid_to
     FROM chunks c
     JOIN dense d ON d.id = c.id
     FULL OUTER JOIN sparse s ON s.id = c.id
+    WHERE CASE
+            WHEN (:as_of)::timestamptz IS NULL THEN c.valid_to IS NULL
+            ELSE (c.valid_from <= (:as_of)::timestamptz
+                  AND (c.valid_to IS NULL OR c.valid_to > (:as_of)::timestamptz))
+          END
     ORDER BY rrf_score DESC
     LIMIT :top_k
     """
@@ -61,6 +69,12 @@ class RetrievedChunk:
     rrf_score: float
     dense_rank: int | None
     sparse_rank: int | None
+    valid_from: dt.datetime | None = None
+    valid_to: dt.datetime | None = None
+
+    @property
+    def is_current(self) -> bool:
+        return self.valid_to is None
 
     @property
     def from_both_legs(self) -> bool:
@@ -73,8 +87,14 @@ async def hybrid_search(
     tenant_id: uuid.UUID,
     query_text: str,
     top_k: int = 10,
+    as_of: dt.datetime | None = None,
 ) -> list[RetrievedChunk]:
-    """Embed the query (once) and fuse dense + sparse results via RRF."""
+    """Embed the query (once) and fuse dense + sparse results via RRF.
+
+    Temporal semantics: `as_of=None` retrieves only currently-valid chunks
+    (valid_to IS NULL). With `as_of`, only chunks whose validity window
+    contains that instant — history for time-travel queries.
+    """
     vectors = await embed_texts([query_text])
     if len(vectors[0]) != EMBEDDING_DIM:
         raise RuntimeError(
@@ -91,6 +111,7 @@ async def hybrid_search(
             "fuse_depth": FUSE_DEPTH,
             "rrf_k": RRF_K,
             "top_k": top_k,
+            "as_of": as_of,
         },
     )
     return [
@@ -102,6 +123,8 @@ async def hybrid_search(
             rrf_score=float(row.rrf_score or 0.0),  # Decimal -> float for JSONB
             dense_rank=row.dense_rank,
             sparse_rank=row.sparse_rank,
+            valid_from=row.valid_from,
+            valid_to=row.valid_to,
         )
         for row in result
     ]

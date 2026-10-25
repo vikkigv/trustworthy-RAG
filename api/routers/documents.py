@@ -74,12 +74,28 @@ async def upload_document(
             status_code=status.HTTP_409_CONFLICT, detail="Identical document already uploaded"
         )
 
+    # Temporal versioning: a same-filename upload is a new version of the
+    # tenant's most recent document with that name.
+    predecessor = (
+        await session.execute(
+            select(Document.id)
+            .where(
+                Document.tenant_id == ctx.tenant_id,
+                Document.filename == (file.filename or "untitled"),
+                Document.checksum != checksum,
+            )
+            .order_by(Document.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
     document = Document(
         tenant_id=ctx.tenant_id,
         filename=file.filename or "untitled",
         mime_type=file.content_type or "application/octet-stream",
         checksum=checksum,
         status=DocumentStatus.PENDING,
+        supersedes_id=predecessor,
     )
     session.add(document)
     await session.flush()  # document.id must exist before bytes are stored

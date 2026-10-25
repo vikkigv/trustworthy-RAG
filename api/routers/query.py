@@ -6,6 +6,7 @@ SSE protocol (one JSON payload per event):
   done       → {query_log_id, answer, citations, confidence}
 """
 
+import datetime as dt
 import json
 import time
 from collections.abc import AsyncIterator
@@ -40,6 +41,9 @@ def _citation(number: int, chunk: RetrievedChunk) -> Citation:
         rrf_score=chunk.rrf_score,
         dense_rank=chunk.dense_rank,
         sparse_rank=chunk.sparse_rank,
+        valid_from=chunk.valid_from,
+        valid_to=chunk.valid_to,
+        is_current=chunk.is_current,
     )
 
 
@@ -47,14 +51,24 @@ def _sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
 
 
+def _parse_as_of(raw: str | None) -> dt.datetime | None:
+    if raw is None:
+        return None
+    parsed = dt.datetime.fromisoformat(raw)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
+
+
 @router.post("")
 async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> StreamingResponse:
+    as_of = _parse_as_of(body.as_of)
     started = time.monotonic()
     trace = start_trace(
         name="query", input=body.question, user_id=str(ctx.user_id or ctx.tenant_id)
     )
     retrieval_span = trace.span(name="hybrid-retrieval", input=body.question)
-    chunks = await hybrid_search(session, ctx.tenant_id, body.question, top_k=body.top_k)
+    chunks = await hybrid_search(
+        session, ctx.tenant_id, body.question, top_k=body.top_k, as_of=as_of
+    )
     retrieval_span.end(
         output=[{"chunk_id": str(c.id), "rrf_score": c.rrf_score} for c in chunks]
     )
@@ -148,6 +162,20 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
             )
             await log_session.commit()
 
+        # Temporal mode: compare with current knowledge so changed policies
+        # can be surfaced (old answer vs what's true now).
+        current_citations = []
+        if as_of is not None:
+            current_chunks = await hybrid_search(
+                session, ctx.tenant_id, body.question, top_k=3
+            )
+            cited_docs = {c.document_id for c in chunks}
+            changed = [c for c in current_chunks if c.document_id not in cited_docs]
+            if changed:
+                current_citations = [
+                    _citation(i + 1, c).model_dump(mode="json") for i, c in enumerate(changed)
+                ]
+
         trace.update(
             output=final_answer,
             metadata={"confidence": verification.confidence, "abstain": verification.abstain},
@@ -161,6 +189,8 @@ async def query(body: QueryRequest, ctx: CurrentAuth, session: DbSession) -> Str
                 "citations": [c.model_dump(mode="json") for c in citations],
                 "confidence": verification.confidence,
                 "abstain": verification.abstain,
+                "as_of": body.as_of,
+                "current_citations": current_citations,
             },
         )
 
