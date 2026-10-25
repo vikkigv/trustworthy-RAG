@@ -44,6 +44,7 @@ and that both retrieval legs (dense + BM25) found it.*
 | **Tracing** | Langfuse traces every stage: retrieval → generation → verification |
 | **Multi-tenant by construction** | Tenant isolation enforced inside the retrieval SQL, never post-filtered |
 | **Temporal queries** | Document version chains; `as_of` retrieval over validity windows; changed-since surfacing |
+| **MCP server** | The whole engine — retrieval, time travel, claim verification — exposed as tools any AI agent can call ([docs/mcp.md](docs/mcp.md)) |
 
 ## Eval results (first run, local models)
 
@@ -127,7 +128,9 @@ Redis + Arq · LiteLLM · Langfuse v2 · uv · Docker Compose · GitHub Actions
 - [x] v2.5 — temporal RAG: version chains, `as_of` time travel, changed-since
       surfacing, temporal evals. 53 tests, all metrics 1.00.
 - [ ] v2.6 — agentic mode (LangGraph)
-- [ ] v3 — MCP server (`rag.search` from any MCP client)
+- [x] v3 — MCP server: `rag.search` (temporal), `rag.get_document`,
+      `rag.verify_claim` from any MCP client (Claude Desktop config in
+      [docs/mcp.md](docs/mcp.md)). 61 tests.
 - [ ] 11b (optional) — Terraform → AWS deploy
 
 Full plan: [BUILD_PLAN.md](BUILD_PLAN.md).
