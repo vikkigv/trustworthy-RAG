@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from api.routers import auth, documents, health, query
+from api.routers import analytics, auth, documents, health, query
 from trust_rag.db.session import dispose_engine, get_session_factory, init_engine
 from trust_rag.settings import get_settings
 from trust_rag.storage import init_storage
@@ -82,3 +82,4 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(query.router)
+app.include_router(analytics.router)
