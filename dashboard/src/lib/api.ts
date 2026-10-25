@@ -163,5 +163,6 @@ export interface DocumentRow {
   id: string;
   filename: string;
   status: string;
+  supersedes_id: string | null;
   created_at: string;
 }

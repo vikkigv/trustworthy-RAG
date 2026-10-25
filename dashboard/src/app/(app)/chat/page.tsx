@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Citation, ClaimVerdict, streamQuery } from "@/lib/api";
+import { Citation, ClaimVerdict, DocumentRow, streamQuery, api } from "@/lib/api";
 import DatePickerPopover from "@/components/DatePickerPopover";
 
 interface Turn {
@@ -40,6 +40,15 @@ export default function ChatPage() {
   // Which turn the Sources panel shows: null = follow the latest.
   const [activeTurn, setActiveTurn] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [hasDocs, setHasDocs] = useState<boolean | null>(null);
+
+  // Empty index is the #1 first-run confusion: point fresh tenants at Documents
+  // instead of letting them discover it via an unexplained abstention.
+  useEffect(() => {
+    api<DocumentRow[]>("/documents")
+      .then((docs) => setHasDocs(docs.length > 0))
+      .catch(() => setHasDocs(null));
+  }, []);
 
   useEffect(() => {
     try {
@@ -85,6 +94,12 @@ export default function ChatPage() {
             : x
         )
       );
+      // Keep the "no documents" guidance accurate if the index emptied.
+      if (events.abstain && events.retrieved.length === 0) {
+        api<DocumentRow[]>("/documents")
+          .then((docs) => setHasDocs(docs.length > 0))
+          .catch(() => {});
+      }
     } catch {
       setTurns((t) =>
         t.map((x, i) => (i === t.length - 1 ? { ...x, answerText: "⚠ Query failed", streaming: false } : x))
@@ -136,6 +151,14 @@ export default function ChatPage() {
                 Answers stream with citations. Every claim is machine-verified.
                 <br />If the evidence isn&apos;t there, TrustRAG will tell you.
               </p>
+              {hasDocs === false && (
+                <div className="inline-block rounded-xl border px-4 py-3 text-sm text-left"
+                     style={{ borderColor: "rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.06)" }}>
+                  <span style={{ color: "var(--cyan)" }}>📄 No documents yet.</span>{" "}
+                  <span style={{ color: "var(--muted)" }}>Upload files first — answers come from your documents, nothing else.</span>{" "}
+                  <a href="/documents" className="underline" style={{ color: "var(--cyan)" }}>Go to Documents →</a>
+                </div>
+              )}
             </div>
           )}
 
@@ -173,6 +196,16 @@ export default function ChatPage() {
                     <span className="mr-2">🛡️</span>
                     {turn.answerText || "I don't have enough confidence in the retrieved evidence to answer."}
                     {turn.reason && <div className="mt-1.5 text-xs opacity-80">{turn.reason}</div>}
+                    {turn.citations.length === 0 && (
+                      <div className="mt-1.5 text-xs" style={{ color: "var(--muted)" }}>
+                        Nothing was found in your documents.{" "}
+                        {hasDocs === false ? (
+                          <>You haven&apos;t uploaded any yet — <a href="/documents" className="underline" style={{ color: "var(--cyan)" }}>upload files</a> to get answers.</>
+                        ) : (
+                          <>Try rephrasing with terms that appear in your documents, or <a href="/documents" className="underline" style={{ color: "var(--cyan)" }}>upload more material</a>.</>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className={`text-[15px] leading-7 whitespace-pre-wrap ${turn.streaming ? "token" : ""}`}>
