@@ -34,6 +34,7 @@ async def acomplete_json(
         model=f"openai/{model or settings.verification_model}",
         api_base=settings.llm_api_base,
         api_key=settings.llm_api_key,
+        temperature=0,  # extraction/verification must be deterministic
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -74,6 +75,7 @@ async def astream_answer(
         api_base=settings.llm_api_base,
         api_key=settings.llm_api_key,
         stream=True,
+        temperature=0,  # grounded answers must be deterministic
         messages=[
             {"role": "system", "content": GROUNDING_SYSTEM_PROMPT},
             {

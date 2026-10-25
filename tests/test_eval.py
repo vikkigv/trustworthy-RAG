@@ -47,6 +47,16 @@ class TestComputeMetrics:
         results = [_result(u, [], answer="42 vesting months [1]", conf=0.9)]
         assert compute_metrics(results)["abstention_accuracy"] == 0.0
 
+    def test_temporal_accuracy(self) -> None:
+        t_hit = _item("t1", "temporal", ["five"], "handbook.md")
+        t_miss = _item("t2", "temporal", ["five"], "handbook.md")
+        results = [
+            _result(t_hit, ["handbook.md"], answer="five days then [1]"),
+            _result(t_miss, ["handbook.md"], answer="zero days [1]"),
+        ]
+        m = compute_metrics(results)
+        assert m["temporal_accuracy"] == 0.5
+
     def test_mean_confidence(self) -> None:
         items = [_item(f"q{i}", "answerable", ["x"], "d.md") for i in range(4)]
         results = [
@@ -59,10 +69,14 @@ class TestComputeMetrics:
 class TestDataset:
     def test_golden_dataset_loads(self) -> None:
         items = load_dataset()
-        assert len(items) >= 12
+        assert len(items) >= 16
         answerable = [i for i in items if i.category == "answerable"]
         unanswerable = [i for i in items if i.category == "unanswerable"]
+        temporal = [i for i in items if i.category == "temporal"]
         assert len(answerable) >= 8 and len(unanswerable) >= 3
+        assert len(temporal) >= 4
+        # every temporal item must anchor to a moment or ask about current state
+        assert all(i.as_of in (None, "mid") for i in temporal)
         # every answerable item must have keywords + expected doc
         assert all(i.expected_keywords and i.expected_doc for i in answerable)
         assert all(not i.expected_doc for i in unanswerable)

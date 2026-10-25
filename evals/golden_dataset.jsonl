@@ -1,7 +1,7 @@
-{"id": "q01", "category": "answerable", "question": "How many vacation days can be carried over to the next year?", "expected_keywords": ["five", "5"], "expected_doc": "employee_handbook.md"}
-{"id": "q02", "category": "answerable", "question": "When do carried-over vacation days expire?", "expected_keywords": ["March 31"], "expected_doc": "employee_handbook.md"}
-{"id": "q03", "category": "answerable", "question": "When is a doctor's note required for sick leave?", "expected_keywords": ["three consecutive"], "expected_doc": "employee_handbook.md"}
-{"id": "q04", "category": "answerable", "question": "What are the core collaboration hours for remote work?", "expected_keywords": ["11:00", "16:00"], "expected_doc": "employee_handbook.md"}
+{"id": "q01", "category": "answerable", "question": "Under the current handbook, do vacation days carry over to the next year?", "expected_keywords": ["not carry over", "do not carry", "expire"], "expected_doc": "employee_handbook.md"}
+{"id": "q02", "category": "answerable", "question": "How far in advance must vacation requests be submitted?", "expected_keywords": ["14"], "expected_doc": "employee_handbook.md"}
+{"id": "q03", "category": "answerable", "question": "Under the current handbook, when is a doctor's note required for sick leave?", "expected_keywords": ["two consecutive"], "expected_doc": "employee_handbook.md"}
+{"id": "q04", "category": "answerable", "question": "How is overtime compensated on weekends?", "expected_keywords": ["2.0"], "expected_doc": "employee_handbook.md"}
 {"id": "q05", "category": "answerable", "question": "How is overtime compensated on weekends?", "expected_keywords": ["2.0"], "expected_doc": "employee_handbook.md"}
 {"id": "q06", "category": "answerable", "question": "How often must passwords be rotated?", "expected_keywords": ["180"], "expected_doc": "security_policy.md"}
 {"id": "q07", "category": "answerable", "question": "Within how many hours must a lost laptop be reported?", "expected_keywords": ["24"], "expected_doc": "security_policy.md"}
@@ -14,3 +14,7 @@
 {"id": "q14", "category": "unanswerable", "question": "How do I book a meeting room in the Berlin office?", "expected_keywords": [], "expected_doc": null}
 {"id": "q15", "category": "unanswerable", "question": "What is the company's revenue for last quarter?", "expected_keywords": [], "expected_doc": null}
 {"id": "q16", "category": "unanswerable", "question": "Who is the designated first-aid officer on each floor?", "expected_keywords": [], "expected_doc": null}
+{"id": "t01", "category": "temporal", "question": "What is the vacation carry-over policy?", "expected_keywords": ["five", "5"], "expected_doc": "employee_handbook.md", "as_of": "mid"}
+{"id": "t02", "category": "temporal", "question": "How many paid sick days per year?", "expected_keywords": ["10"], "expected_doc": "employee_handbook.md", "as_of": "mid"}
+{"id": "t03", "category": "temporal", "question": "What are the core collaboration hours?", "expected_keywords": ["11:00"], "expected_doc": "employee_handbook.md", "as_of": "mid"}
+{"id": "t04", "category": "temporal", "question": "Since the 2026 revision, do vacation days carry over?", "expected_keywords": ["not carry over", "do not carry", "expire"], "expected_doc": "employee_handbook.md"}

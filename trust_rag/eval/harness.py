@@ -17,6 +17,7 @@ import subprocess
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -31,6 +32,7 @@ from trust_rag.storage import init_storage
 from trust_rag.verification.verifier import verify_answer
 
 CORPUS_DIR = Path(__file__).parents[2] / "evals" / "corpus"
+CORPUS_V2_DIR = Path(__file__).parents[2] / "evals" / "corpus_v2"
 DEFAULT_DATASET = Path(__file__).parents[2] / "evals" / "golden_dataset.jsonl"
 TOP_K = 6
 
@@ -42,6 +44,7 @@ class GoldenItem:
     question: str
     expected_keywords: list[str]
     expected_doc: str | None
+    as_of: str | None = None  # "mid" = between v1 and v2 corpus ingestion
 
 
 @dataclass
@@ -84,6 +87,7 @@ def load_dataset(path: Path = DEFAULT_DATASET) -> list[GoldenItem]:
                 question=d["question"],
                 expected_keywords=d.get("expected_keywords", []),
                 expected_doc=d.get("expected_doc"),
+                as_of=d.get("as_of"),
             )
         )
     return items
@@ -92,6 +96,7 @@ def load_dataset(path: Path = DEFAULT_DATASET) -> list[GoldenItem]:
 def compute_metrics(results: list[ItemResult]) -> dict[str, float]:
     answerable = [r for r in results if r.item.category == "answerable"]
     unanswerable = [r for r in results if r.item.category == "unanswerable"]
+    temporal = [r for r in results if r.item.category == "temporal"]
 
     def rate(sub: list[ItemResult], prop: str) -> float:
         if not sub:
@@ -103,6 +108,7 @@ def compute_metrics(results: list[ItemResult]) -> dict[str, float]:
         "retrieval_hit_rate": rate(answerable, "retrieval_hit"),
         "answer_success_rate": rate(answerable, "answer_correct"),
         "abstention_accuracy": rate(unanswerable, "refused"),
+        "temporal_accuracy": rate(temporal, "answer_correct"),
         "mean_confidence": round(
             sum(r.confidence for r in answerable) / len(answerable), 4
         ) if answerable else 0.0,
@@ -141,18 +147,53 @@ async def _seed_eval_tenant() -> uuid.UUID:
 
     for doc_id in doc_ids:
         await run_ingestion(doc_id)
-    return tenant_id
+
+    mid = datetime.now(UTC)  # v1 valid, revision not yet ingested
+
+    for corpus_file in sorted(CORPUS_V2_DIR.glob("*.md")):
+        # Mirror the upload API's version detection: same filename supersedes.
+        predecessor = (
+            await session.execute(
+                select(Document.id)
+                .where(
+                    Document.tenant_id == tenant_id,
+                    Document.filename == corpus_file.name,
+                )
+                .order_by(Document.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        doc = Document(
+            tenant_id=tenant_id,
+            filename=corpus_file.name,
+            mime_type="text/markdown",
+            checksum=uuid.uuid4().hex,
+            status=DocumentStatus.PENDING,
+            supersedes_id=predecessor,
+        )
+        session.add(doc)
+        await session.flush()
+        await get_storage().save(tenant_id, doc.id, corpus_file.read_bytes())
+        doc_ids.append(doc.id)
+    await session.commit()
+
+    for doc_id in doc_ids[len(doc_ids) - len(list(CORPUS_V2_DIR.glob("*.md"))):]:
+        await run_ingestion(doc_id)
+    return tenant_id, mid
 
 
 async def run_eval(dataset_path: Path = DEFAULT_DATASET) -> dict[str, float]:
     items = load_dataset(dataset_path)
-    tenant_id = await _seed_eval_tenant()
+    tenant_id, mid = await _seed_eval_tenant()
+    as_of_map = {"mid": mid}  # sentinel -> the instant between corpus versions
     sessions = get_session_factory()
 
     results: list[ItemResult] = []
     async with sessions() as session:
         for item in items:
-            chunks = await hybrid_search(session, tenant_id, item.question, top_k=TOP_K)
+            chunks = await hybrid_search(
+                session, tenant_id, item.question, top_k=TOP_K, as_of=as_of_map.get(item.as_of)
+            )
             retrieved_docs = []
             context = build_context(chunks)
             answer_parts = []

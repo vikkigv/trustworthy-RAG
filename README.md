@@ -1,9 +1,11 @@
-# TrustRAG — a RAG platform that proves its answers
+# TrustRAG — a RAG platform that proves its answers (and remembers history)
 
 Most RAG demos hallucinate confidently. TrustRAG **shows its work**: every
 claim in every answer is machine-verified against the retrieved evidence,
 citations link to the exact source chunks, the system **abstains** when
-confidence is low — and a built-in evaluation harness puts numbers on all of it.
+confidence is low — and you can ask **"as of last March?"** and get the answer
+from the version that was true then, with a warning that the policy has since
+changed. A built-in evaluation harness puts numbers on all of it.
 
 ```
 Q: How many vacation days can I carry over?
@@ -17,6 +19,20 @@ Q: What is the stock options vesting schedule?
 
 ![demo](docs/demo.gif)
 
+## Temporal RAG — time-travel queries
+
+Re-uploading a document creates a new version; old chunks keep their validity
+window. Ask with a date and retrieval restricts itself to what was true *then*,
+cites the historical passage with its dates, and flags when the answer no
+longer matches current knowledge:
+
+![temporal](docs/temporal-demo.png)
+
+*Left to right: "as of 2026-10-25" chip · time-traveled answer from handbook v1
+("five days carry over") · "Changed since then" banner quoting the current
+policy ("do not carry over") · source card showing the chunk's validity window
+and that both retrieval legs (dense + BM25) found it.*
+
 ## What makes it different
 
 | Feature | What it means here |
@@ -27,6 +43,7 @@ Q: What is the stock options vesting schedule?
 | **Eval-in-the-loop** | 16-question golden dataset scored through the real pipeline (see below); results stored per git SHA for regression tracking |
 | **Tracing** | Langfuse traces every stage: retrieval → generation → verification |
 | **Multi-tenant by construction** | Tenant isolation enforced inside the retrieval SQL, never post-filtered |
+| **Temporal queries** | Document version chains; `as_of` retrieval over validity windows; changed-since surfacing |
 
 ## Eval results (first run, local models)
 
@@ -35,7 +52,8 @@ Q: What is the stock options vesting schedule?
 | retrieval_hit_rate (12 answerable) | **1.00** |
 | answer_success_rate | **1.00** |
 | abstention_accuracy (4 unanswerable) | **1.00** |
-| mean_confidence | 0.90 |
+| temporal_accuracy (4 time-travel questions) | **1.00** |
+| mean_confidence | 0.83 |
 
 Run it yourself: `make eval`.
 
@@ -103,9 +121,11 @@ Redis + Arq · LiteLLM · Langfuse v2 · uv · Docker Compose · GitHub Actions
 
 - [x] v1 — trustworthy pipeline: auth (JWT + API keys, multi-tenant), upload +
       storage, ingestion, hybrid retrieval, SSE query with citations, claim
-      verification + abstention, tracing, eval harness. 44 tests, evals green.
-- [ ] v2 — dashboard, A/B retrieval playground, semantic cache, chat memory
-- [ ] v2.5 — temporal RAG ("as of March 2024…", contradiction surfacing)
+      verification + abstention, tracing, eval harness.
+- [x] v2 — dashboard UI (chat with streaming + citations, documents, eval
+      history + claim stats + query log)
+- [x] v2.5 — temporal RAG: version chains, `as_of` time travel, changed-since
+      surfacing, temporal evals. 53 tests, all metrics 1.00.
 - [ ] v2.6 — agentic mode (LangGraph)
 - [ ] v3 — MCP server (`rag.search` from any MCP client)
 - [ ] 11b (optional) — Terraform → AWS deploy
