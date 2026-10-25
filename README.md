@@ -46,6 +46,8 @@ and that both retrieval legs (dense + BM25) found it.*
 | **Temporal queries** | Document version chains; `as_of` retrieval over validity windows; changed-since surfacing |
 | **MCP server** | The whole engine — retrieval, time travel, claim verification — exposed as tools any AI agent can call ([docs/mcp.md](docs/mcp.md)) |
 
+![dashboard](docs/dashboard.png)
+
 ## Eval results (first run, local models)
 
 | Metric | Score |

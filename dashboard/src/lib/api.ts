@@ -41,6 +41,7 @@ export async function api<T>(
     const body = await res.text();
     throw new Error(body || `API error ${res.status}`);
   }
+  if (res.status === 204) return undefined as T; // DELETE endpoints return no body
   return res.json() as Promise<T>;
 }
 

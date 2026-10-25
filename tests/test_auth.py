@@ -92,6 +92,17 @@ class TestApiKeys:
         assert keys.status_code == 200
         assert all("raw_key" not in k and "key_hash" not in k for k in keys.json())
 
+        # Revocation: the key stops authenticating and disappears from the list.
+        key_id = keys.json()[0]["id"]
+        revoked = client.delete(f"/auth/api-keys/{key_id}", headers=_auth_headers(token))
+        assert revoked.status_code == 204
+        assert client.get("/auth/me", headers={"X-API-Key": raw_key}).status_code == 401
+        assert client.get("/auth/api-keys", headers=_auth_headers(token)).json() == []
+        assert (
+            client.delete(f"/auth/api-keys/{key_id}", headers=_auth_headers(token)).status_code
+            == 404
+        )
+
     def test_api_key_cannot_mint_api_keys(self, client, credentials: dict[str, str]) -> None:
         client.post("/auth/register", json=credentials)
         token = _get_token(client, credentials)

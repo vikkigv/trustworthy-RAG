@@ -8,6 +8,7 @@ const NAV = [
   { href: "/chat", label: "Chat", icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
   { href: "/documents", label: "Documents", icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" },
   { href: "/dashboard", label: "Dashboard", icon: "M3 3v18h18M7 14l4-4 3 3 5-6" },
+  { href: "/api-keys", label: "API keys", icon: "M15 7a4 4 0 1 1-4 4 4 4 0 0 1 4-4zM3 11h2m14 0h2M11 3v2m0 14v2M5.6 5.6l1.4 1.4m10 10 1.4 1.4m0-12.8-1.4 1.4m-10 10-1.4 1.4" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
